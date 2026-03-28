@@ -5,6 +5,9 @@
 expo-env.d.ts
 # @end expo-cli
 
+# Expo local state
+.expo/
+
 # Local env — never commit. Use EAS Secrets for production values.
 .env
 .env.local

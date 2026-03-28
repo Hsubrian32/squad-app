@@ -1,0 +1,71 @@
+{
+  "expo": {
+    "name": "Squad",
+    "slug": "squad",
+    "scheme": "squad",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0A0A0A"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.squad.app",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Squad uses your location to verify you've arrived at the meetup venue and to help find venues central to your group.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Squad uses your location to verify venue arrival.",
+        "NSPhotoLibraryUsageDescription": "Squad needs access to your photo library so you can choose a profile picture."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0A0A0A"
+      },
+      "package": "com.squad.app",
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#0A0A0A"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Squad needs access to your photo library so you can choose a profile picture."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "54ba99f0-8ecc-49e2-a6ba-60e4c31347f5"
+      }
+    }
+  }
+}

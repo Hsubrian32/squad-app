@@ -1,0 +1,15 @@
+{
+  "name": "squad",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/mobile",
+    "apps/admin",
+    "packages/shared"
+  ],
+  "scripts": {
+    "mobile": "cd apps/mobile && npx expo start",
+    "admin": "cd apps/admin && npm run dev",
+    "admin:build": "cd apps/admin && npm run build"
+  }
+}

@@ -215,7 +215,9 @@ export default function ProfileScreen() {
         .from('avatars')
         .getPublicUrl(`${user.id}/avatar.jpg`);
 
-      await updateProfile(user.id, { avatar_url: urlData.publicUrl });
+      // Append cache-buster so React Native Image doesn't serve stale cache
+      const freshUrl = `${urlData.publicUrl}?t=${Date.now()}`;
+      await updateProfile(user.id, { avatar_url: freshUrl });
       await refreshProfile();
     } catch (err: any) {
       Alert.alert('Error', err?.message ?? 'Could not upload photo.');

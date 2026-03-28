@@ -15,7 +15,7 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.squad.app",
+      "bundleIdentifier": "com.hsubrian32.squad",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Squad uses your location to verify you've arrived at the meetup venue and to help find venues central to your group.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Squad uses your location to verify venue arrival.",
@@ -27,7 +27,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0A0A0A"
       },
-      "package": "com.squad.app",
+      "package": "com.hsubrian32.squad",
       "permissions": [
         "android.permission.RECORD_AUDIO"
       ]

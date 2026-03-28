@@ -34,22 +34,27 @@ export async function signUp(
       return { data: null, error: 'No user returned after sign up' };
     }
 
+    // The on_auth_user_created trigger already inserts a bare profile row
+    // (with first_name = NULL) before this code runs. Using .update() instead
+    // of .upsert() avoids a race condition where the upsert's INSERT path
+    // conflicts with the trigger-created row and silently skips the UPDATE,
+    // leaving first_name as NULL.
     const { data: profileData, error: profileError } = await supabase
       .from('profiles')
-      .upsert({
-        id: authData.user.id,
+      .update({
         first_name: firstName,
         bio: null,
         age: null,
         avatar_url: null,
         onboarding_complete: false,
       })
+      .eq('id', authData.user.id)
       .select()
       .single();
 
     if (profileError) {
-      // Auth user was created but profile insert failed; still return user
-      logger.error('Profile insert failed during sign-up:', profileError.message);
+      // Auth user was created but profile update failed; still return user
+      logger.error('Profile update failed during sign-up:', profileError.message);
       return {
         data: {
           user: { id: authData.user.id, email: authData.user.email },

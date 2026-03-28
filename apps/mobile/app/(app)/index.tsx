@@ -137,7 +137,7 @@ export default function HomeScreen() {
             </Text>
           </View>
           <View style={styles.logoMark}>
-            <Text style={styles.logoMarkText}>C</Text>
+            <Text style={styles.logoMarkText}>S</Text>
           </View>
         </View>
 

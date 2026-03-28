@@ -48,6 +48,17 @@ interface PromptData {
 
 type PromptsMap = Partial<Record<PromptKey, PromptData>>;
 
+const PROMPT_PLACEHOLDERS: Record<string, string> = {
+  'My ideal Saturday looks like\u2026': 'e.g. Farmers market \u2192 park hangs \u2192 trying a new restaurant',
+  'The best way to get to know me is\u2026': 'e.g. Over a long walk and way too much coffee',
+  "I'm looking for people who\u2026": 'e.g. Are down for spontaneous adventures and deep convos',
+  'A random fact about me is\u2026': 'e.g. I can name every country in Africa in under 2 minutes',
+  "I'll know we'll get along if\u2026": 'e.g. You have strong opinions about pizza toppings',
+  'The most spontaneous thing I\u2019ve done is\u2026': 'e.g. Booked a one-way flight to Tokyo on a Tuesday',
+  'My love language is\u2026': 'e.g. Acts of service and sending memes at 2am',
+  "I'm weirdly obsessed with\u2026": 'e.g. Ranking every coffee shop I\u2019ve ever been to',
+};
+
 // ---------------------------------------------------------------------------
 // Screen
 // ---------------------------------------------------------------------------
@@ -67,6 +78,7 @@ export default function ProfileScreen() {
   // Modals
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [previewModalVisible, setPreviewModalVisible] = useState(false);
+  const [editingPromptIndex, setEditingPromptIndex] = useState<0 | 1 | 2 | null>(null);
 
   // Sign out
   const [signOutLoading, setSignOutLoading] = useState(false);
@@ -181,13 +193,14 @@ export default function ProfileScreen() {
       setUploading(true);
       const uri = result.assets[0].uri;
 
-      // Fetch the image as a blob for Supabase upload
+      // Fetch the image as an ArrayBuffer for Supabase upload
+      // (blob() is unreliable on React Native for local file URIs)
       const response = await fetch(uri);
-      const blob = await response.blob();
+      const arraybuffer = await response.arrayBuffer();
 
       const { error } = await supabase.storage
         .from('avatars')
-        .upload(`${user.id}/avatar.jpg`, blob, {
+        .upload(`${user.id}/avatar.jpg`, arraybuffer, {
           upsert: true,
           contentType: 'image/jpeg',
         });
@@ -363,13 +376,13 @@ export default function ProfileScreen() {
               style={{ marginTop: Spacing.md }}
             />
           ) : (
-            PROMPT_KEYS.map((key) => {
+            PROMPT_KEYS.map((key, idx) => {
               const prompt = prompts[key];
               return (
                 <TouchableOpacity
                   key={key}
                   style={styles.promptCard}
-                  onPress={() => setEditModalVisible(true)}
+                  onPress={() => setEditingPromptIndex(idx as 0 | 1 | 2)}
                   activeOpacity={0.8}
                 >
                   {prompt ? (
@@ -506,7 +519,7 @@ export default function ProfileScreen() {
                 size={14}
                 color={Colors.textSecondary}
               />
-              <Text style={styles.helpInlineText}>hello@coterieapp.co</Text>
+              <Text style={styles.helpInlineText}>hello@squadapp.co</Text>
             </View>
           )}
         </View>
@@ -588,7 +601,224 @@ export default function ProfileScreen() {
           prompts={prompts}
         />
       )}
+
+      {/* Prompt Editor Modal */}
+      {user && editingPromptIndex !== null && (
+        <PromptEditorModal
+          visible
+          onClose={() => setEditingPromptIndex(null)}
+          userId={user.id}
+          promptIndex={editingPromptIndex}
+          promptKey={PROMPT_KEYS[editingPromptIndex]}
+          existingPrompt={prompts[PROMPT_KEYS[editingPromptIndex]] ?? null}
+          onSaved={(key, promptData) => {
+            if (promptData) {
+              setPrompts((prev) => ({ ...prev, [key]: promptData }));
+            } else {
+              setPrompts((prev) => {
+                const next = { ...prev };
+                delete next[key];
+                return next;
+              });
+            }
+            setEditingPromptIndex(null);
+          }}
+        />
+      )}
     </SafeAreaView>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Prompt editor modal (focused single-prompt editor)
+// ---------------------------------------------------------------------------
+
+interface PromptEditorModalProps {
+  visible: boolean;
+  onClose: () => void;
+  userId: string;
+  promptIndex: 0 | 1 | 2;
+  promptKey: PromptKey;
+  existingPrompt: PromptData | null;
+  onSaved: (key: PromptKey, data: PromptData | null) => void;
+}
+
+function PromptEditorModal({
+  visible,
+  onClose,
+  userId,
+  promptIndex,
+  promptKey,
+  existingPrompt,
+  onSaved,
+}: PromptEditorModalProps) {
+  const [questionIndex, setQuestionIndex] = useState(0);
+  const [answer, setAnswer] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  // Sync when modal opens
+  useEffect(() => {
+    if (visible) {
+      if (existingPrompt) {
+        const qi = PROMPT_QUESTIONS.indexOf(existingPrompt.question);
+        setQuestionIndex(qi >= 0 ? qi : promptIndex);
+        setAnswer(existingPrompt.answer);
+      } else {
+        setQuestionIndex(promptIndex);
+        setAnswer('');
+      }
+      setSaveError(null);
+    }
+  }, [visible, existingPrompt, promptIndex]);
+
+  const cycleQuestion = (direction: 1 | -1) => {
+    setQuestionIndex(
+      (prev) =>
+        (prev + direction + PROMPT_QUESTIONS.length) % PROMPT_QUESTIONS.length
+    );
+  };
+
+  const currentQuestion = PROMPT_QUESTIONS[questionIndex];
+  const placeholder =
+    PROMPT_PLACEHOLDERS[currentQuestion] ?? 'Your answer\u2026';
+
+  async function handleDone() {
+    setSaveError(null);
+
+    // If answer is empty, delete the prompt
+    if (!answer.trim()) {
+      setIsSaving(true);
+      try {
+        await supabase
+          .from('questionnaire_answers')
+          .delete()
+          .eq('user_id', userId)
+          .eq('question_key', promptKey);
+        onSaved(promptKey, null);
+      } catch {
+        setSaveError('Could not remove prompt.');
+      } finally {
+        setIsSaving(false);
+      }
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const { error } = await supabase
+        .from('questionnaire_answers')
+        .upsert(
+          {
+            user_id: userId,
+            question_key: promptKey,
+            answer: {
+              question: currentQuestion,
+              answer: answer.trim(),
+            },
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'user_id,question_key' }
+        );
+
+      if (error) {
+        setSaveError(error.message);
+        return;
+      }
+
+      onSaved(promptKey, {
+        question: currentQuestion,
+        answer: answer.trim(),
+      });
+    } catch {
+      setSaveError('Something went wrong.');
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={onClose}
+    >
+      <View style={promptEditorStyles.container}>
+        {/* Header */}
+        <View style={promptEditorStyles.header}>
+          <TouchableOpacity onPress={onClose} style={promptEditorStyles.headerSide}>
+            <Text style={promptEditorStyles.cancelText}>Cancel</Text>
+          </TouchableOpacity>
+          <Text style={promptEditorStyles.headerTitle}>
+            {existingPrompt ? 'Edit Prompt' : 'Add Prompt'}
+          </Text>
+          <View style={promptEditorStyles.headerSide} />
+        </View>
+
+        <View style={promptEditorStyles.content}>
+          {/* Question picker */}
+          <View style={promptEditorStyles.questionRow}>
+            <TouchableOpacity
+              onPress={() => cycleQuestion(-1)}
+              style={promptEditorStyles.arrow}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="chevron-back" size={18} color={Colors.accent} />
+            </TouchableOpacity>
+            <Text style={promptEditorStyles.questionText} numberOfLines={2}>
+              {currentQuestion}
+            </Text>
+            <TouchableOpacity
+              onPress={() => cycleQuestion(1)}
+              style={promptEditorStyles.arrow}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="chevron-forward" size={18} color={Colors.accent} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Answer input */}
+          <TextInput
+            style={promptEditorStyles.answerInput}
+            value={answer}
+            onChangeText={(v) => setAnswer(v.slice(0, 200))}
+            placeholder={placeholder}
+            placeholderTextColor={Colors.textTertiary}
+            multiline
+            maxLength={200}
+            selectionColor={Colors.accent}
+            autoFocus
+          />
+          <Text style={promptEditorStyles.charCount}>{answer.length}/200</Text>
+
+          {/* Error */}
+          {saveError ? (
+            <View style={promptEditorStyles.errorBox}>
+              <Ionicons name="alert-circle-outline" size={16} color={Colors.error} />
+              <Text style={promptEditorStyles.errorText}>{saveError}</Text>
+            </View>
+          ) : null}
+
+          {/* Done button */}
+          <TouchableOpacity
+            style={[
+              promptEditorStyles.doneButton,
+              isSaving && promptEditorStyles.doneButtonDisabled,
+            ]}
+            onPress={handleDone}
+            disabled={isSaving}
+            activeOpacity={0.85}
+          >
+            {isSaving ? (
+              <ActivityIndicator size="small" color={Colors.textPrimary} />
+            ) : (
+              <Text style={promptEditorStyles.doneButtonText}>Done</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -1866,5 +2096,113 @@ const previewStyles = StyleSheet.create({
     color: Colors.textTertiary,
     textAlign: 'center',
     marginTop: Spacing.md,
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Styles — prompt editor modal
+// ---------------------------------------------------------------------------
+
+const promptEditorStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: Colors.background,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  headerSide: {
+    minWidth: 60,
+  },
+  headerTitle: {
+    ...Typography.h4,
+    color: Colors.textPrimary,
+    textAlign: 'center',
+    flex: 1,
+  },
+  cancelText: {
+    ...Typography.body,
+    color: Colors.textSecondary,
+  },
+  content: {
+    padding: Spacing.lg,
+    paddingTop: Spacing.xl,
+    gap: Spacing.md,
+  },
+  questionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.md,
+    gap: Spacing.xs,
+  },
+  arrow: {
+    padding: Spacing.xs,
+  },
+  questionText: {
+    ...Typography.label,
+    color: Colors.accent,
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 15,
+  },
+  answerInput: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
+    ...Typography.body,
+    color: Colors.textPrimary,
+    minHeight: 120,
+    textAlignVertical: 'top',
+  },
+  charCount: {
+    ...Typography.caption,
+    color: Colors.textTertiary,
+    textAlign: 'right',
+    marginTop: -Spacing.xs,
+  },
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    backgroundColor: Colors.errorLight,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.error,
+  },
+  errorText: {
+    ...Typography.bodySmall,
+    color: Colors.error,
+    flex: 1,
+  },
+  doneButton: {
+    backgroundColor: Colors.accent,
+    borderRadius: Radius.md,
+    paddingVertical: Spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: Spacing.sm,
+  },
+  doneButtonDisabled: {
+    opacity: 0.6,
+  },
+  doneButtonText: {
+    ...Typography.body,
+    color: Colors.textPrimary,
+    fontWeight: '700',
   },
 });

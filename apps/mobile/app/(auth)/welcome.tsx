@@ -133,7 +133,7 @@ export default function WelcomeScreen() {
             Real groups.{'\n'}Real nights out.
           </Text>
           <Text style={styles.subheadline}>
-            We match you with 5–7 people every week — not an endless feed of strangers.
+            We match you with 6–8 people every week — not an endless feed of strangers.
           </Text>
         </Animated.View>
 
@@ -157,9 +157,9 @@ export default function WelcomeScreen() {
             accentColor="#E86FC5"
           />
           <FeatureCard
-            emoji="🗓️"
-            title="Once a week"
-            body="No pressure. Just show up."
+            emoji="🔁"
+            title="Keep or explore"
+            body="Stay with your group or find new people each week"
             accentColor="#F5A623"
           />
           <FeatureCard

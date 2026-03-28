@@ -290,6 +290,27 @@ export async function getGroupHistory(userId: string): Promise<ApiResult<Group[]
   }
 }
 
+// ---- Get Group by ID ----
+
+export async function getGroupById(
+  groupId: string
+): Promise<ApiResult<Group>> {
+  const { data, error } = await supabase
+    .from('groups')
+    .select(`
+      *,
+      venue:venues(*),
+      members:group_members(
+        *,
+        profile:profiles(id, first_name, display_name, nickname, avatar_url, intro, vibe_tags, privacy_preference)
+      )
+    `)
+    .eq('id', groupId)
+    .single();
+
+  return { data, error: error?.message ?? null };
+}
+
 // ---- Post-Event Review ----
 
 export async function submitPostEventReview(

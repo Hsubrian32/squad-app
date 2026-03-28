@@ -259,7 +259,7 @@ export default function OnboardingCompleteScreen() {
         >
           <InfoPill emoji="📅" text="Every Monday you get your group" />
           <InfoPill emoji="📍" text="A real venue, already picked for you" />
-          <InfoPill emoji="🎭" text="5–7 people matched to your vibe" />
+          <InfoPill emoji="🎭" text="6–8 people matched to your vibe" />
         </Animated.View>
       </View>
 

@@ -11,11 +11,11 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { format, isPast, parseISO } from 'date-fns';
 import { useAuth } from '../../store/authStore';
 import { useGroup } from '../../store/groupStore';
-import { updateRsvp, updateArrivalStatus, submitStayVote } from '../../lib/api/groups';
+import { updateRsvp, updateArrivalStatus, submitStayVote, getGroupById } from '../../lib/api/groups';
 import { joinDemoGroup } from '../../lib/api/dev';
 import { reportUser, blockUser, REPORT_REASON_LABELS, type ReportReason } from '../../lib/api/safety';
 import { track } from '../../lib/analytics';
@@ -88,7 +88,12 @@ const ARRIVAL_OPTIONS: ArrivalOption[] = [
 export default function GroupScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const { id: groupIdParam } = useLocalSearchParams<{ id?: string }>();
   const { currentGroup, isLoading, fetchGroup } = useGroup();
+
+  // When an explicit group ID is passed via query param, fetch that group directly
+  const [specificGroup, setSpecificGroup] = useState<import('../../constants/types').Group | null>(null);
+  const [specificGroupLoading, setSpecificGroupLoading] = useState(false);
 
   const [arrivalStatus, setArrivalStatus] = useState<ArrivalStatus | null>(null);
   const [arrivalLoading, setArrivalLoading] = useState(false);
@@ -121,22 +126,33 @@ export default function GroupScreen() {
   const [voteSuccess, setVoteSuccess] = useState<string | null>(null);
 
   const loadGroup = useCallback(async () => {
-    if (user) await fetchGroup(user.id);
-  }, [user, fetchGroup]);
+    if (groupIdParam) {
+      setSpecificGroupLoading(true);
+      const { data, error } = await getGroupById(groupIdParam);
+      if (!error && data) setSpecificGroup(data);
+      setSpecificGroupLoading(false);
+    } else if (user) {
+      await fetchGroup(user.id);
+    }
+  }, [user, fetchGroup, groupIdParam]);
 
   useEffect(() => {
     loadGroup();
   }, [loadGroup]);
 
+  // Resolve which group to display: specific (from param) or current (from store)
+  const displayGroup = groupIdParam ? specificGroup : currentGroup;
+  const displayLoading = groupIdParam ? specificGroupLoading : isLoading;
+
   // Sync local arrivalStatus from server data
   useEffect(() => {
-    if (!currentGroup || !user) return;
-    const members = currentGroup.members ?? [];
+    if (!displayGroup || !user) return;
+    const members = displayGroup.members ?? [];
     const me = members.find((m) => m.user_id === user.id);
     setArrivalStatus(me?.arrival_status ?? null);
-  }, [currentGroup, user]);
+  }, [displayGroup, user]);
 
-  if (isLoading && !currentGroup) {
+  if (displayLoading && !displayGroup) {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.emptyState}>
@@ -146,7 +162,7 @@ export default function GroupScreen() {
     );
   }
 
-  if (!currentGroup) {
+  if (!displayGroup) {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.emptyState}>
@@ -192,19 +208,19 @@ export default function GroupScreen() {
     );
   }
 
-  const venue = currentGroup.venue;
-  const members = currentGroup.members ?? [];
+  const venue = displayGroup.venue;
+  const members = displayGroup.members ?? [];
   const me = members.find((m) => m.user_id === user?.id);
 
-  const scheduledTime = currentGroup.scheduled_time
-    ? parseISO(currentGroup.scheduled_time)
+  const scheduledTime = displayGroup.scheduled_time
+    ? parseISO(displayGroup.scheduled_time)
     : null;
   const eventIsPast = scheduledTime ? isPast(scheduledTime) : false;
 
   // Past groups (completed or dissolved) always show full profiles —
   // the meetup already happened so there's no more mystery to preserve.
   const isPastGroup =
-    currentGroup.status === 'completed' || currentGroup.status === 'dissolved';
+    displayGroup.status === 'completed' || displayGroup.status === 'dissolved';
 
   // Arrival stats
   const arrivedCount = members.filter(
@@ -217,7 +233,7 @@ export default function GroupScreen() {
   // ---- Handlers ----
 
   async function handleArrivalStatus(option: ArrivalOption) {
-    if (!user || !currentGroup) return;
+    if (!user || !displayGroup) return;
     setArrivalLoading(true);
     setArrivalError(null);
     setSavingStatus(option.status);
@@ -227,7 +243,7 @@ export default function GroupScreen() {
 
     try {
       const { error: arrivalErr } = await updateArrivalStatus(
-        currentGroup.id,
+        displayGroup.id,
         user.id,
         option.status
       );
@@ -239,7 +255,7 @@ export default function GroupScreen() {
       }
 
       // Background RSVP sync — fire-and-forget, ignore errors
-      updateRsvp(currentGroup.id, user.id, option.rsvp).catch(() => undefined);
+      updateRsvp(displayGroup.id, user.id, option.rsvp).catch(() => undefined);
 
       await loadGroup();
     } finally {
@@ -250,7 +266,7 @@ export default function GroupScreen() {
 
   // Show a reason picker then submit the report
   function handleReportMember(memberId: string, memberNickname: string) {
-    if (!user || !currentGroup) return;
+    if (!user || !displayGroup) return;
     if (memberId === user.id) return; // can't report yourself
 
     const reasons = Object.entries(REPORT_REASON_LABELS) as [ReportReason, string][];
@@ -274,10 +290,10 @@ export default function GroupScreen() {
                     const { error } = await reportUser({
                       reporterId: user.id,
                       reportedId: memberId,
-                      groupId: currentGroup.id,
+                      groupId: displayGroup.id,
                       reason,
                     });
-                    track('user_reported', { reason, group_id: currentGroup.id });
+                    track('user_reported', { reason, group_id: displayGroup.id });
                     Alert.alert(
                       error ? 'Could not submit report' : 'Report submitted',
                       error ?? 'Thanks — our team will review this.',
@@ -307,7 +323,7 @@ export default function GroupScreen() {
           style: 'destructive',
           onPress: async () => {
             await blockUser(user.id, memberId);
-            track('user_blocked', { group_id: currentGroup?.id });
+            track('user_blocked', { group_id: displayGroup?.id });
             Alert.alert('Blocked', `${memberNickname} has been blocked.`);
           },
         },
@@ -316,12 +332,12 @@ export default function GroupScreen() {
   }
 
   async function handleStayVote(stay: boolean) {
-    if (!user || !currentGroup) return;
+    if (!user || !displayGroup) return;
     setVoteLoading(true);
     setVoteError(null);
     setVoteSuccess(null);
     try {
-      const { error } = await submitStayVote(currentGroup.id, user.id, stay);
+      const { error } = await submitStayVote(displayGroup.id, user.id, stay);
       if (error) {
         setVoteError(error);
         return;
@@ -354,7 +370,7 @@ export default function GroupScreen() {
         <View style={styles.groupHeader}>
           <View style={styles.groupHeaderLeft}>
             <Text style={styles.groupName}>
-              {currentGroup.name ?? 'Your Group'}
+              {displayGroup.name ?? 'Your Group'}
             </Text>
             {/* Arrival stats */}
             <View style={styles.checkInStat}>
@@ -395,14 +411,14 @@ export default function GroupScreen() {
                 styles.statusDot,
                 {
                   backgroundColor:
-                    currentGroup.status === 'active'
+                    displayGroup.status === 'active'
                       ? Colors.success
                       : Colors.warning,
                 },
               ]}
             />
             <Text style={styles.statusPillText}>
-              {currentGroup.status === 'active' ? 'Active' : 'Forming'}
+              {displayGroup.status === 'active' ? 'Active' : 'Forming'}
             </Text>
           </View>
         </View>
@@ -420,7 +436,7 @@ export default function GroupScreen() {
                 <Text style={styles.venueCity}>{venue.neighborhood}</Text>
               )}
               {/* Original venue badge */}
-              {currentGroup.venue_id === venue.id && (
+              {displayGroup.venue_id === venue.id && (
                 <View style={styles.originalVenueBadge}>
                   <Text style={styles.originalVenueBadgeText}>
                     📍 Original venue
@@ -442,7 +458,7 @@ export default function GroupScreen() {
         )}
 
         {/* Map button — only shown when the group has a venue with coordinates */}
-        {(currentGroup.status === 'active' || currentGroup.status === 'forming') &&
+        {(displayGroup.status === 'active' || displayGroup.status === 'forming') &&
           venue != null && (venue as any).lat != null && (
           <TouchableOpacity
             style={styles.mapButton}

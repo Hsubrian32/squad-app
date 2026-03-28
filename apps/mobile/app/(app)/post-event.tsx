@@ -120,6 +120,11 @@ export default function PostEventScreen() {
   }, [confirmScale, confirmOpacity]);
 
   const handleNextStep = async () => {
+    if (!eventId || !groupId || !user?.id) {
+      setError('Missing required information. Please go back and try again.');
+      return;
+    }
+
     if (overallRating === 0) {
       Alert.alert('Rating Required', 'Please provide an overall rating before continuing.');
       return;
@@ -156,6 +161,11 @@ export default function PostEventScreen() {
   };
 
   const handleSubmitDecision = async () => {
+    if (!eventId || !groupId || !user?.id) {
+      setError('Missing required information. Please go back and try again.');
+      return;
+    }
+
     if (!stayLeaveChoice) {
       Alert.alert('Choice Required', 'Please choose whether to stay or leave.');
       return;

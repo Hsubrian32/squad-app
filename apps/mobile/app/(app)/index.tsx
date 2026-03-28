@@ -321,17 +321,22 @@ export default function HomeScreen() {
               <HowItWorksStep
                 number="1"
                 title="Get Matched"
-                description="Every Monday we match you with 4–6 people based on your interests and availability."
+                description="Every week we match you with 6–8 people based on your interests and availability."
               />
               <HowItWorksStep
                 number="2"
-                title="See Your Venue"
-                description="We pick a curated spot in your city — a hidden bar, rooftop, or local gem."
+                title="Meet Up"
+                description="We pick a curated spot in your city — a hidden bar, rooftop, or local gem. Show up, check in, and vibe."
               />
               <HowItWorksStep
                 number="3"
-                title="Show Up"
-                description="RSVP, chat with your group beforehand, and just show up. That's it."
+                title="Stay or Explore"
+                description="After the meetup, decide if you want to keep your group or get matched with new people next week."
+              />
+              <HowItWorksStep
+                number="4"
+                title="Unlock More Groups"
+                description="After your first meetup, join up to 3 groups on different days. Find your people through real experiences."
               />
             </View>
           </>

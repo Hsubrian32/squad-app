@@ -4,16 +4,21 @@ import {
   getCurrentGroup,
   getGroupMessages,
   sendMessage as apiSendMessage,
+  getUserGroupHistory,
 } from '../lib/api/groups';
-import type { Group, Message } from '../constants/types';
+import type { Group, Message, UserGroupHistoryEntry } from '../constants/types';
 
 // ---------------------------------------------------------------------------
 // State & Actions
 // ---------------------------------------------------------------------------
 
 interface GroupState {
+  /** All active groups the user belongs to */
+  activeGroups: Group[];
+  /** Backward-compat: first active group (or null) */
   currentGroup: Group | null;
   messages: Message[];
+  groupHistory: UserGroupHistoryEntry[];
   isLoading: boolean;
   isMessagesLoading: boolean;
   error: string | null;
@@ -23,9 +28,11 @@ type GroupAction =
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_MESSAGES_LOADING'; payload: boolean }
   | { type: 'SET_GROUP'; payload: Group | null }
+  | { type: 'SET_ACTIVE_GROUPS'; payload: Group[] }
   | { type: 'SET_MESSAGES'; payload: Message[] }
   | { type: 'APPEND_MESSAGE'; payload: Message }
   | { type: 'SET_ERROR'; payload: string | null }
+  | { type: 'SET_GROUP_HISTORY'; payload: UserGroupHistoryEntry[] }
   | { type: 'CLEAR_GROUP' };
 
 function groupReducer(state: GroupState, action: GroupAction): GroupState {
@@ -35,7 +42,21 @@ function groupReducer(state: GroupState, action: GroupAction): GroupState {
     case 'SET_MESSAGES_LOADING':
       return { ...state, isMessagesLoading: action.payload };
     case 'SET_GROUP':
-      return { ...state, currentGroup: action.payload, isLoading: false, error: null };
+      return {
+        ...state,
+        currentGroup: action.payload,
+        activeGroups: action.payload ? [action.payload, ...state.activeGroups.filter(g => g.id !== action.payload!.id)] : state.activeGroups,
+        isLoading: false,
+        error: null,
+      };
+    case 'SET_ACTIVE_GROUPS':
+      return {
+        ...state,
+        activeGroups: action.payload,
+        currentGroup: action.payload[0] ?? null,
+        isLoading: false,
+        error: null,
+      };
     case 'SET_MESSAGES':
       return { ...state, messages: action.payload, isMessagesLoading: false };
     case 'APPEND_MESSAGE':
@@ -46,10 +67,14 @@ function groupReducer(state: GroupState, action: GroupAction): GroupState {
       return { ...state, messages: [...state.messages, action.payload] };
     case 'SET_ERROR':
       return { ...state, error: action.payload, isLoading: false };
+    case 'SET_GROUP_HISTORY':
+      return { ...state, groupHistory: action.payload };
     case 'CLEAR_GROUP':
       return {
+        activeGroups: [],
         currentGroup: null,
         messages: [],
+        groupHistory: [],
         isLoading: false,
         isMessagesLoading: false,
         error: null,
@@ -68,6 +93,7 @@ interface GroupContextValue extends GroupState {
   fetchMessages: (groupId: string) => Promise<void>;
   sendMessage: (groupId: string, userId: string, content: string) => Promise<{ error: string | null }>;
   subscribeToMessages: (groupId: string) => () => void;
+  fetchGroupHistory: (userId: string) => Promise<void>;
 }
 
 const GroupContext = createContext<GroupContextValue | undefined>(undefined);
@@ -78,8 +104,10 @@ const GroupContext = createContext<GroupContextValue | undefined>(undefined);
 
 export function GroupProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(groupReducer, {
+    activeGroups: [],
     currentGroup: null,
     messages: [],
+    groupHistory: [],
     isLoading: true,   // start true — prevents empty-state flash before first fetch
     isMessagesLoading: false,
     error: null,
@@ -182,6 +210,18 @@ export function GroupProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  const fetchGroupHistory = useCallback(async (userId: string) => {
+    const { data, error } = await getUserGroupHistory(userId);
+
+    if (error) {
+      // Non-critical — don't set global error, just log
+      console.warn('[groupStore] fetchGroupHistory error:', error);
+      return;
+    }
+
+    dispatch({ type: 'SET_GROUP_HISTORY', payload: data ?? [] });
+  }, []);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -197,6 +237,7 @@ export function GroupProvider({ children }: { children: React.ReactNode }) {
     fetchMessages,
     sendMessage,
     subscribeToMessages,
+    fetchGroupHistory,
   };
 
   return React.createElement(GroupContext.Provider, { value }, children);

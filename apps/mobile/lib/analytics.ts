@@ -43,6 +43,13 @@ export type AnalyticsEvent =
   // Feedback
   | 'feedback_started'
   | 'feedback_completed'
+  // Post-event
+  | 'post_event_review_submitted'
+  | 'stay_leave_decision_submitted'
+  // Matching
+  | 'manual_opt_in'
+  // Groups page
+  | 'groups_page_viewed'
   // Safety
   | 'user_reported'
   | 'user_blocked';

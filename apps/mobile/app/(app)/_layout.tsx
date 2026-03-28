@@ -40,9 +40,9 @@ export default function AppLayout() {
         }}
       />
       <Tabs.Screen
-        name="group"
+        name="groups"
         options={{
-          title: 'Group',
+          title: 'Groups',
           tabBarIcon: ({ color, size, focused }) => (
             <Ionicons
               name={focused ? 'people' : 'people-outline'}
@@ -50,6 +50,12 @@ export default function AppLayout() {
               color={color}
             />
           ),
+        }}
+      />
+      <Tabs.Screen
+        name="group"
+        options={{
+          href: null, // Hidden from tab bar — accessed via groups list
         }}
       />
       <Tabs.Screen
@@ -94,6 +100,12 @@ export default function AppLayout() {
         name="availability-edit"
         options={{
           href: null, // Hidden from tab bar — launched from Profile screen
+        }}
+      />
+      <Tabs.Screen
+        name="post-event"
+        options={{
+          href: null, // Hidden from tab bar — launched after meetup
         }}
       />
     </Tabs>

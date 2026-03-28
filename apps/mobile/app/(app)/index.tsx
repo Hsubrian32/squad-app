@@ -11,11 +11,11 @@ import {
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { format, nextMonday, differenceInDays, differenceInHours } from 'date-fns';
+import { format, nextMonday, differenceInDays, differenceInHours, isPast } from 'date-fns';
 import { useAuth } from '../../store/authStore';
 import { useGroup } from '../../store/groupStore';
 import { GroupCard } from '../../components/GroupCard';
-import { checkInToGroup } from '../../lib/api/groups';
+import { checkInToGroup, getMyDecision } from '../../lib/api/groups';
 import { optInToCurrentCycle } from '../../lib/api/matching';
 import { Colors, Spacing, Radius, Typography } from '../../constants/theme';
 import { track } from '../../lib/analytics';
@@ -54,6 +54,7 @@ export default function HomeScreen() {
   const [checkInLoading, setCheckInLoading] = useState(false);
   const [checkInError, setCheckInError] = useState<string | null>(null);
   const [optInLoading, setOptInLoading] = useState(false);
+  const [hasSubmittedDecision, setHasSubmittedDecision] = useState(false);
 
   const { refreshProfile } = useAuth();
 
@@ -80,6 +81,20 @@ export default function HomeScreen() {
   const checkedInCount =
     currentGroup?.members?.filter((m) => m.checked_in).length ?? 0;
   const totalMembers = currentGroup?.members?.length ?? 0;
+
+  // Post-event: has the scheduled time passed and user checked in?
+  const eventTimePassed =
+    currentGroup?.scheduled_time && isPast(new Date(currentGroup.scheduled_time));
+  const needsPostEventReview = isCheckedIn && eventTimePassed && !hasSubmittedDecision;
+
+  // Check if user already submitted decision for this group
+  useEffect(() => {
+    if (!user || !currentGroup?.id) return;
+    // Use a simple event_id placeholder — in production this would be the actual event_id
+    getMyDecision(currentGroup.id, user.id).then(({ data }) => {
+      if (data) setHasSubmittedDecision(true);
+    });
+  }, [user, currentGroup?.id]);
 
   async function handleJoinPool() {
     if (!user) return;
@@ -170,6 +185,26 @@ export default function HomeScreen() {
                       {checkedInCount} of {totalMembers} members checked in
                     </Text>
                   </View>
+
+                  {/* Post-event review prompt */}
+                  {needsPostEventReview && (
+                    <TouchableOpacity
+                      style={styles.postEventPrompt}
+                      onPress={() =>
+                        router.push({
+                          pathname: '/(app)/post-event',
+                          params: { groupId: currentGroup.id, eventId: currentGroup.id },
+                        })
+                      }
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="star" size={18} color={Colors.accent} />
+                      <Text style={styles.postEventPromptText}>
+                        How was the meetup? Rate & review
+                      </Text>
+                      <Ionicons name="chevron-forward" size={16} color={Colors.accent} />
+                    </TouchableOpacity>
+                  )}
                 </View>
               ) : (
                 // Not yet checked in
@@ -494,6 +529,21 @@ const styles = StyleSheet.create({
   checkedInCountText: {
     ...Typography.label,
     color: SUCCESS_GREEN,
+  },
+  postEventPrompt: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    paddingTop: Spacing.sm,
+    marginTop: Spacing.xs,
+    borderTopWidth: 1,
+    borderTopColor: SUCCESS_GREEN_BORDER,
+  },
+  postEventPromptText: {
+    ...Typography.body,
+    color: Colors.accent,
+    fontWeight: '600',
+    flex: 1,
   },
   // -------------------------------------------------------------------------
   // Chat button

@@ -188,3 +188,79 @@ export const TIME_SLOT_RANGES: Record<TimeSlot, { start: string; end: string }> 
   evening:   { start: '17:00:00', end: '21:00:00' },
   night:     { start: '21:00:00', end: '24:00:00' },
 };
+
+// Event Instances (recurring group events)
+export interface EventInstance {
+  id: string;
+  group_id: string;
+  cycle_id: string | null;
+  week_number: number;
+  scheduled_time: string;
+  venue_id: string | null;
+  status: 'scheduled' | 'active' | 'completed' | 'cancelled';
+  venue?: Venue;
+  created_at: string;
+}
+
+// Event Attendance
+export interface EventAttendance {
+  id: string;
+  event_id: string;
+  user_id: string;
+  group_id: string;
+  checked_in: boolean;
+  checked_in_at: string | null;
+  arrival_status: 'on_the_way' | 'arrived' | 'running_late' | 'cant_make_it' | null;
+  rsvp_status: 'pending' | 'yes' | 'no' | 'maybe';
+}
+
+// Post-Event Review
+export interface PostEventReview {
+  id: string;
+  event_id: string;
+  user_id: string;
+  group_id: string;
+  overall_rating: number;
+  vibe_rating: number | null;
+  venue_rating: number | null;
+  would_return: boolean | null;
+  comment: string | null;
+  created_at: string;
+}
+
+// Stay/Leave Decision
+export interface StayLeaveDecision {
+  id: string;
+  event_id: string;
+  user_id: string;
+  group_id: string;
+  decision: 'stay' | 'leave';
+  created_at: string;
+}
+
+// User Group History (from view)
+export interface UserGroupHistoryEntry {
+  user_id: string;
+  group_id: string;
+  group_name: string | null;
+  group_status: 'forming' | 'active' | 'completed' | 'dissolved';
+  day_of_week: number | null;
+  is_recurring: boolean;
+  scheduled_time: string | null;
+  total_events: number;
+  group_created_at: string;
+  membership_status: 'invited' | 'active' | 'removed' | 'left';
+  joined_at: string;
+  left_at: string | null;
+  leave_reason: 'voluntary' | 'no_show' | 'dissolved' | 'removed' | null;
+  events_attended: number;
+  ever_checked_in: boolean;
+  venue_name: string | null;
+  venue_neighborhood: string | null;
+  display_status: 'active' | 'left' | 'dissolved' | 'no_show' | 'completed' | 'unknown';
+  sort_section: number;
+  sort_date: string;
+}
+
+// Post-event flow state
+export type PostEventStep = 'review' | 'stay_leave' | 'complete';

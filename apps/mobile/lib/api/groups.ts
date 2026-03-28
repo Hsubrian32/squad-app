@@ -1,5 +1,15 @@
 import { supabase, getErrorMessage } from '../supabase';
-import type { Group, Message, ApiResult, RsvpStatus, ArrivalStatus } from '../../constants/types';
+import type {
+  Group,
+  Message,
+  ApiResult,
+  RsvpStatus,
+  ArrivalStatus,
+  PostEventReview,
+  StayLeaveDecision,
+  UserGroupHistoryEntry,
+  EventInstance,
+} from '../../constants/types';
 
 // Fetch all venue columns — using * avoids compile-time parsing failures
 // that Supabase's type inference triggers on very long explicit field lists.
@@ -278,4 +288,156 @@ export async function getGroupHistory(userId: string): Promise<ApiResult<Group[]
   } catch (err) {
     return { data: null, error: getErrorMessage(err) };
   }
+}
+
+// ---- Post-Event Review ----
+
+export async function submitPostEventReview(
+  eventId: string,
+  userId: string,
+  groupId: string,
+  review: {
+    overall_rating: number;
+    vibe_rating?: number;
+    venue_rating?: number;
+    would_return?: boolean;
+    comment?: string;
+  }
+): Promise<ApiResult<PostEventReview>> {
+  const { data, error } = await supabase
+    .from('post_event_reviews')
+    .upsert(
+      {
+        event_id: eventId,
+        user_id: userId,
+        group_id: groupId,
+        overall_rating: review.overall_rating,
+        vibe_rating: review.vibe_rating ?? null,
+        venue_rating: review.venue_rating ?? null,
+        would_return: review.would_return ?? null,
+        comment: review.comment?.trim() || null,
+      },
+      { onConflict: 'event_id,user_id' }
+    )
+    .select()
+    .single();
+
+  return { data, error: error?.message ?? null };
+}
+
+export async function getMyReview(
+  eventId: string,
+  userId: string
+): Promise<ApiResult<PostEventReview | null>> {
+  const { data, error } = await supabase
+    .from('post_event_reviews')
+    .select('*')
+    .eq('event_id', eventId)
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  return { data: data ?? null, error: error?.message ?? null };
+}
+
+// ---- Stay/Leave Decision ----
+
+export async function submitStayLeaveDecision(
+  eventId: string,
+  userId: string,
+  groupId: string,
+  decision: 'stay' | 'leave'
+): Promise<ApiResult<StayLeaveDecision>> {
+  const { data, error } = await supabase
+    .from('stay_leave_decisions')
+    .upsert(
+      {
+        event_id: eventId,
+        user_id: userId,
+        group_id: groupId,
+        decision,
+      },
+      { onConflict: 'event_id,user_id' }
+    )
+    .select()
+    .single();
+
+  return { data, error: error?.message ?? null };
+}
+
+export async function getMyDecision(
+  eventId: string,
+  userId: string
+): Promise<ApiResult<StayLeaveDecision | null>> {
+  const { data, error } = await supabase
+    .from('stay_leave_decisions')
+    .select('*')
+    .eq('event_id', eventId)
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  return { data: data ?? null, error: error?.message ?? null };
+}
+
+// ---- Group History ----
+
+export async function getUserGroupHistory(
+  userId: string
+): Promise<ApiResult<UserGroupHistoryEntry[]>> {
+  const { data, error } = await supabase
+    .from('user_group_history')
+    .select('*')
+    .eq('user_id', userId)
+    .order('sort_section', { ascending: true })
+    .order('sort_date', { ascending: false });
+
+  return { data: data ?? [], error: error?.message ?? null };
+}
+
+// ---- Event Instances ----
+
+export async function getGroupEvents(
+  groupId: string
+): Promise<ApiResult<EventInstance[]>> {
+  const { data, error } = await supabase
+    .from('event_instances')
+    .select('*, venue:venues(*)')
+    .eq('group_id', groupId)
+    .order('week_number', { ascending: true });
+
+  return { data: data ?? [], error: error?.message ?? null };
+}
+
+export async function getCurrentEvent(
+  groupId: string
+): Promise<ApiResult<EventInstance | null>> {
+  const { data, error } = await supabase
+    .from('event_instances')
+    .select('*, venue:venues(*)')
+    .eq('group_id', groupId)
+    .in('status', ['scheduled', 'active'])
+    .order('week_number', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  return { data: data ?? null, error: error?.message ?? null };
+}
+
+// ---- Multi-group eligibility ----
+
+export async function checkGroupEligibility(
+  userId: string,
+  dayOfWeek?: number
+): Promise<ApiResult<{
+  eligible: boolean;
+  reason?: string;
+  max_groups: number;
+  active_count: number;
+  slots_remaining?: number;
+}>> {
+  const { data, error } = await supabase.rpc('can_join_new_group', {
+    p_user_id: userId,
+    p_day_of_week: dayOfWeek ?? null,
+  });
+
+  return { data, error: error?.message ?? null };
 }

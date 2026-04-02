@@ -15,9 +15,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
-               BuildableName = "Coterie.app"
-               BlueprintName = "Coterie"
-               ReferencedContainer = "container:Coterie.xcodeproj">
+               BuildableName = "Squad.app"
+               BlueprintName = "Squad"
+               ReferencedContainer = "container:Squad.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -33,9 +33,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "00E356ED1AD99517003FC87E"
-               BuildableName = "CoterieTests.xctest"
-               BlueprintName = "CoterieTests"
-               ReferencedContainer = "container:Coterie.xcodeproj">
+               BuildableName = "SquadTests.xctest"
+               BlueprintName = "SquadTests"
+               ReferencedContainer = "container:Squad.xcodeproj">
             </BuildableReference>
          </TestableReference>
       </Testables>
@@ -55,9 +55,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
-            BuildableName = "Coterie.app"
-            BlueprintName = "Coterie"
-            ReferencedContainer = "container:Coterie.xcodeproj">
+            BuildableName = "Squad.app"
+            BlueprintName = "Squad"
+            ReferencedContainer = "container:Squad.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -72,9 +72,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
-            BuildableName = "Coterie.app"
-            BlueprintName = "Coterie"
-            ReferencedContainer = "container:Coterie.xcodeproj">
+            BuildableName = "Squad.app"
+            BlueprintName = "Squad"
+            ReferencedContainer = "container:Squad.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>
